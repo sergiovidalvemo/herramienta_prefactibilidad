@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  vemo-prefactibilidad:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - vemo-network
+
+  # Nginx reverse proxy (opcional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - vemo-prefactibilidad
+    restart: unless-stopped
+    networks:
+      - vemo-network
+
+networks:
+  vemo-network:
+    driver: bridge
+
+# Volúmenes para persistencia de datos (si es necesario en el futuro)
+volumes:
+  vemo_data:

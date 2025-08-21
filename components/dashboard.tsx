@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -39,52 +39,21 @@ import {
   ArrowUp,
 } from "lucide-react"
 import VemoLogo from "./vemo-logo"
+import { calculateVehicleElectrification, generateMonthlyData, generateFleetStatus } from "@/lib/calculations"
 
-interface DashboardData {
+interface DashboardProps {
   plan: "plus" | "pro"
-  fleetSize: number
-  monthlySavings: number
-  co2Reduction: number
-  batteryCapacity: string
-  chargingPower: number
-  paybackPeriod: number
-  roi: number
+  calculationInputs: {
+    fleetSize: number
+    routeKmPerDay: number
+    dieselCost: number
+    maintenanceSpend: number
+    vehicleType: "sedan" | "van" | "truck"
+    operationType: "relaxed" | "intermediate" | "intensive"
+  }
 }
 
-const mockData: DashboardData = {
-  plan: "plus",
-  fleetSize: 25,
-  monthlySavings: 48844,
-  co2Reduction: 259,
-  batteryCapacity: "85-110",
-  chargingPower: 450,
-  paybackPeriod: 41,
-  roi: 65,
-}
 
-const savingsData = [
-  { month: "Ene", diesel: 85000, ev: 52000 },
-  { month: "Feb", diesel: 87000, ev: 53500 },
-  { month: "Mar", diesel: 89000, ev: 54800 },
-  { month: "Abr", diesel: 91000, ev: 56200 },
-  { month: "May", diesel: 93000, ev: 57600 },
-  { month: "Jun", diesel: 95000, ev: 59000 },
-]
-
-const co2Data = [
-  { month: "Ene", reduccion: 18 },
-  { month: "Feb", reduccion: 22 },
-  { month: "Mar", reduccion: 25 },
-  { month: "Abr", reduccion: 28 },
-  { month: "May", reduccion: 31 },
-  { month: "Jun", reduccion: 35 },
-]
-
-const fleetStatusData = [
-  { name: "Operativos", value: 22, color: "#115F5F" },
-  { name: "Mantenimiento", value: 2, color: "#FF7575" },
-  { name: "Carga", value: 1, color: "#FFA500" },
-]
 
 const formatYAxis = (value: number) => {
   if (value >= 1000000) {
@@ -95,10 +64,14 @@ const formatYAxis = (value: number) => {
   return `$${value.toLocaleString()}`
 }
 
-export default function Dashboard() {
+function DashboardContent({ plan, calculationInputs }: DashboardProps) {
   const searchParams = useSearchParams()
-  const currentPlan = (searchParams.get("plan") as "plus" | "pro") || "plus"
-  const [data] = useState<DashboardData>({ ...mockData, plan: currentPlan })
+  const currentPlan = (searchParams.get("plan") as "plus" | "pro") || plan
+
+  // Calculate real data based on inputs
+  const calculationResult = calculateVehicleElectrification(calculationInputs)
+  const { savingsData, co2Data } = generateMonthlyData(calculationResult)
+  const fleetStatusData = generateFleetStatus(calculationInputs.fleetSize)
 
   const handlePlanSwitch = () => {
     const newPlan = currentPlan === "plus" ? "pro" : "plus"
@@ -190,7 +163,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-[#115F5F]">Ahorro Mensual</p>
-                  <p className="text-3xl font-bold text-[#115F5F]">${data.monthlySavings.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-[#115F5F]">${calculationResult.totalMonthlySavings.toLocaleString()}</p>
                   <p className="text-sm text-green-600 flex items-center mt-1">
                     <TrendingUp className="w-4 h-4 mr-1" />
                     +12% vs mes anterior
@@ -206,7 +179,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-green-700">CO₂ Evitado</p>
-                  <p className="text-3xl font-bold text-green-600">{data.co2Reduction}t</p>
+                  <p className="text-3xl font-bold text-green-600">{calculationResult.co2}t</p>
                   <p className="text-sm text-green-600 flex items-center mt-1">
                     <Leaf className="w-4 h-4 mr-1" />
                     Este año
@@ -222,7 +195,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-blue-700">Flota Activa</p>
-                  <p className="text-3xl font-bold text-blue-600">{data.fleetSize}</p>
+                  <p className="text-3xl font-bold text-blue-600">{calculationResult.fleetSize}</p>
                   <p className="text-sm text-blue-600 flex items-center mt-1">
                     <Car className="w-4 h-4 mr-1" />
                     Vehículos EV
@@ -238,7 +211,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-purple-700">ROI Actual</p>
-                  <p className="text-3xl font-bold text-purple-600">{data.roi}%</p>
+                  <p className="text-3xl font-bold text-purple-600">{Math.round((calculationResult.totalMonthlySavings * 12) / (calculationResult.fleetSize * 80000) * 100)}%</p>
                   <p className="text-sm text-purple-600 flex items-center mt-1">
                     <Target className="w-4 h-4 mr-1" />
                     Anualizado
@@ -438,5 +411,22 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function Dashboard({ plan, calculationInputs }: DashboardProps) {
+  return (
+    <Suspense 
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#115F5F] mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando dashboard...</p>
+          </div>
+        </div>
+      }
+    >
+      <DashboardContent plan={plan} calculationInputs={calculationInputs} />
+    </Suspense>
   )
 }
