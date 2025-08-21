@@ -1,318 +1,646 @@
 "use client"
 
-import { Suspense, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
-import { TrendingUp, Zap, DollarSign, Truck, Leaf, Clock, Download, Share2, Eye } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { TrendingUp, Leaf, ArrowRight, CheckCircle, AlertCircle, Zap, Battery, Crown, X, Plug } from "lucide-react"
+import Confetti from "./confetti"
 import VemoLogo from "./vemo-logo"
 
-// Componente interno que usa useSearchParams
-function ResultPreviewContent() {
+interface ChargingInfrastructure {
+  dailyEnergyPerVehicle: number
+  totalDailyEnergy: number
+  chargingHours: number
+  requiredChargingPower: number
+  chargerType: string
+  chargerPowerKw: number
+  chargersPerStation: number
+  requiredStations: number
+  totalInstalledPower: number
+  estimatedInstallationCost: number
+}
+
+interface ResultData {
+  savingsPct: number
+  co2: number
+  ev?: string
+  monthlyFuelSavings: number
+  paybackMonths: number
+  totalMonthlySavings?: number
+  monthlySavings?: number
+  fleetSize?: number
+  routeKmPerDay?: number
+  vehicleType?: string
+  operationType?: string
+  batteryCapacityMin?: number
+  batteryCapacityMax?: number
+  chargingInfrastructure?: ChargingInfrastructure
+}
+
+export default function ResultPreview() {
   const searchParams = useSearchParams()
-  const [showFullReport, setShowFullReport] = useState(false)
+  const [data, setData] = useState<ResultData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [showPlanModal, setShowPlanModal] = useState(false)
 
-  // Datos de ejemplo basados en los parámetros
-  const vehicleType = searchParams.get("vehicle") || "van"
-  const dailyKm = Number.parseInt(searchParams.get("dailyKm") || "150")
-  const fleetSize = Number.parseInt(searchParams.get("fleetSize") || "5")
+  // Memoize the confetti trigger to prevent re-renders
+  const triggerConfetti = useCallback(() => {
+    if (!showConfetti) {
+      const timer = setTimeout(() => {
+        setShowConfetti(true)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [showConfetti])
 
-  // Cálculos basados en los parámetros
-  const annualSavings = Math.round(dailyKm * 365 * 0.12 * fleetSize + fleetSize * 2400)
-  const co2Reduction = Math.round((dailyKm * 365 * 0.15 * fleetSize) / 1000)
-  const paybackPeriod = Math.round(((35000 * fleetSize) / annualSavings) * 10) / 10
+  useEffect(() => {
+    const encodedData = searchParams.get("d")
 
-  const handleDownloadReport = () => {
-    // Simular descarga de reporte
-    alert("Descargando reporte completo en PDF...")
+    if (!encodedData) {
+      setError("No data provided")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const decodedData = JSON.parse(atob(encodedData))
+
+      // Calculate battery capacity with realistic consumption rates and 30% margin
+      const dailyKm = decodedData.routeKmPerDay || 150
+      const vehicleType = decodedData.vehicleType || "sedan"
+      const operationType = decodedData.operationType || "intermediate"
+      const fleetSize = decodedData.fleetSize || 1
+
+      // Consumption rates based on vehicle type
+      let energyConsumptionKwhPerKm = 0.15 // Default for sedans
+      if (vehicleType === "van" || vehicleType === "truck") {
+        energyConsumptionKwhPerKm = 0.3 // For vans and trucks
+      }
+
+      // Daily energy consumption
+      const dailyEnergyNeed = dailyKm * energyConsumptionKwhPerKm
+
+      // Base battery capacity with 30% operational buffer
+      const batteryCapacityBase = dailyEnergyNeed * 1.3
+
+      // Account for 80% State of Health at year 5 (20% degradation)
+      // Need to size battery 25% larger to maintain operation at 80% SOH
+      const batteryCapacityWithDegradation = batteryCapacityBase * 1.25
+
+      // Apply 30% margin for recommendations and round to common battery sizes
+      const recommendedMinCapacity = Math.ceil((batteryCapacityBase * 1.3) / 5) * 5 // Round to nearest 5kWh
+      const recommendedMaxCapacity = Math.ceil((batteryCapacityWithDegradation * 1.3) / 5) * 5 // Round to nearest 5kWh
+
+      // Calculate charging infrastructure
+      const dailyEnergyPerVehicle = dailyKm * energyConsumptionKwhPerKm
+      const totalDailyEnergy = dailyEnergyPerVehicle * fleetSize
+      const chargingHours = 9 // 22:00 to 07:00
+      const requiredChargingPower = totalDailyEnergy / chargingHours
+
+      // Determine charger type based on operation type
+      let chargerType = ""
+      let chargerPowerKw = 0
+      let chargersPerStation = 1
+      let estimatedCostPerStation = 0
+
+      switch (operationType) {
+        case "relaxed":
+          chargerType = "Cargador domiciliario 7kW"
+          chargerPowerKw = 7
+          chargersPerStation = 1
+          estimatedCostPerStation = 3500
+          break
+        case "intermediate":
+          chargerType = "Cargador comercial 60kW (2×30kW)"
+          chargerPowerKw = 60
+          chargersPerStation = 2
+          estimatedCostPerStation = 45000
+          break
+        case "intensive":
+          chargerType = "Cargador rápido 120kW (2×60kW)"
+          chargerPowerKw = 120
+          chargersPerStation = 2
+          estimatedCostPerStation = 85000
+          break
+        default:
+          chargerType = "Cargador comercial 60kW (2×30kW)"
+          chargerPowerKw = 60
+          chargersPerStation = 2
+          estimatedCostPerStation = 45000
+      }
+
+      const effectiveChargerPower = chargerPowerKw
+      const requiredStations = Math.ceil(requiredChargingPower / effectiveChargerPower)
+      const totalInstalledPower = requiredStations * chargerPowerKw
+      const estimatedInstallationCost = requiredStations * estimatedCostPerStation
+
+      const chargingInfrastructure: ChargingInfrastructure = {
+        dailyEnergyPerVehicle: Math.round(dailyEnergyPerVehicle * 10) / 10,
+        totalDailyEnergy: Math.round(totalDailyEnergy * 10) / 10,
+        chargingHours,
+        requiredChargingPower: Math.round(requiredChargingPower * 10) / 10,
+        chargerType,
+        chargerPowerKw,
+        chargersPerStation,
+        requiredStations,
+        totalInstalledPower,
+        estimatedInstallationCost,
+      }
+
+      const enhancedData = {
+        ...decodedData,
+        monthlySavings: decodedData.totalMonthlySavings || decodedData.monthlySavings || 0,
+        fleetSize: fleetSize,
+        batteryCapacityMin: recommendedMinCapacity,
+        batteryCapacityMax: recommendedMaxCapacity,
+        chargingInfrastructure,
+      }
+
+      setData(enhancedData)
+      setIsLoading(false)
+
+      // Trigger confetti only once
+      triggerConfetti()
+    } catch (err) {
+      console.error("Error decoding data:", err)
+      setError("Invalid data format")
+      setIsLoading(false)
+    }
+  }, [searchParams.get("d"), triggerConfetti]) // Use specific param instead of searchParams object
+
+  const handlePlanSelection = (plan: "plus" | "pro") => {
+    if (data) {
+      const encodedData = btoa(JSON.stringify(data))
+      window.location.href = `/result/enhanced?d=${encodedData}&plan=${plan}`
+    }
   }
 
-  const handleShareReport = () => {
-    // Simular compartir reporte
-    if (navigator.share) {
-      navigator.share({
-        title: "Análisis VEMO - Transición a Flota Eléctrica",
-        text: `Ahorro anual proyectado: €${annualSavings.toLocaleString()}`,
-        url: window.location.href,
-      })
-    } else {
-      navigator.clipboard.writeText(window.location.href)
-      alert("Enlace copiado al portapapeles")
-    }
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#115F5F] mx-auto mb-4"></div>
+          <p className="text-gray-600">Calculando resultados...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Error</h2>
+            <p className="text-gray-600 mb-6">{error || "No se encontraron datos"}</p>
+            <Button onClick={() => (window.location.href = "/form")} className="bg-[#115F5F] hover:bg-[#0d4a4a]">
+              Volver al formulario
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {showConfetti && <Confetti />}
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <VemoLogo size="md" />
-            <div>
-              <h1 className="text-2xl font-bold text-[#115F5F]">Análisis de Prefactibilidad</h1>
-              <p className="text-gray-600">Resultados de tu evaluación</p>
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <VemoLogo size="md" />
+              <div>
+                <h1 className="text-2xl font-bold text-[#115F5F]">Resultados Preliminares</h1>
+                <p className="text-gray-600">Análisis básico de tu flota eléctrica</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" onClick={handleShareReport}>
-              <Share2 className="w-4 h-4 mr-2" />
-              Compartir
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadReport}>
-              <Download className="w-4 h-4 mr-2" />
-              Descargar PDF
-            </Button>
+            <Badge className="bg-green-100 text-green-800">Análisis Completado</Badge>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Executive Summary */}
-        <Card className="mb-8 border-l-4 border-l-[#115F5F]">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Eye className="h-5 w-5" />
-              <span>Resumen Ejecutivo</span>
-            </CardTitle>
-            <CardDescription>Análisis preliminar para tu flota de {fleetSize} vehículos</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <TrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-green-600">€{annualSavings.toLocaleString()}</div>
-                <p className="text-sm text-gray-600">Ahorro anual proyectado</p>
+      {/* Success Banner */}
+      <div className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold">🎉 ¡Excelentes noticias para tu flota!</h2>
+            <p className="text-sm opacity-90">
+              La electrificación puede generar ahorros significativos y reducir tu huella de carbono
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Results */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {/* Savings Card */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="text-center bg-gradient-to-br from-[#115F5F]/5 to-[#115F5F]/10 border-[#115F5F]/20">
+              <CardContent className="p-6">
+                <TrendingUp className="w-12 h-12 text-[#115F5F] mx-auto mb-4" />
+                <div className="text-3xl font-bold text-[#115F5F] mb-2">{data.savingsPct}%</div>
+                <p className="text-gray-600 font-medium">Ahorro OPEX</p>
+                <p className="text-sm text-gray-500 mt-2">${(data.monthlySavings || 0).toLocaleString()} mensuales</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* CO2 Card */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="text-center bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+              <CardContent className="p-6">
+                <Leaf className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <div className="text-3xl font-bold text-green-600 mb-2">{data.co2}t</div>
+                <p className="text-gray-600 font-medium">CO₂ evitado/año</p>
+                <p className="text-sm text-gray-500 mt-2">Equivale a plantar {Math.round(data.co2 * 45)} árboles</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Battery Capacity Card */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <Card className="text-center bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+              <CardContent className="p-6">
+                <Battery className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+                <div className="text-3xl font-bold text-blue-600 mb-2">
+                  {data.batteryCapacityMin}-{data.batteryCapacityMax} kWh
+                </div>
+                <p className="text-gray-600 font-medium">Batería recomendada</p>
+                <p className="text-sm text-gray-500 mt-2">Capacidad por vehículo</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Charging Infrastructure Card */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+            <Card className="text-center bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+              <CardContent className="p-6">
+                <Plug className="w-12 h-12 text-purple-600 mx-auto mb-4" />
+                <div className="text-3xl font-bold text-purple-600 mb-2">
+                  {data.chargingInfrastructure?.totalInstalledPower || 0} kW
+                </div>
+                <p className="text-gray-600 font-medium">Potencia requerida</p>
+                <p className="text-sm text-gray-500 mt-2">Instalación eléctrica</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* Charging Infrastructure Details */}
+        {data.chargingInfrastructure && (
+          <Card className="mb-8 border-purple-200 bg-purple-50/50">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Plug className="w-6 h-6 text-purple-600" />
+                <span>Infraestructura de Carga Recomendada</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-semibold text-purple-900 mb-3">Análisis Energético:</h4>
+                  <ul className="text-sm text-purple-800 space-y-2">
+                    <li>
+                      • <strong>Consumo por vehículo:</strong> {data.chargingInfrastructure.dailyEnergyPerVehicle}{" "}
+                      kWh/día
+                    </li>
+                    <li>
+                      • <strong>Consumo total flota:</strong> {data.chargingInfrastructure.totalDailyEnergy} kWh/día
+                    </li>
+                    <li>
+                      • <strong>Ventana de carga:</strong> {data.chargingInfrastructure.chargingHours} horas
+                      (22:00-07:00)
+                    </li>
+                    <li>
+                      • <strong>Potencia de carga requerida:</strong>{" "}
+                      {data.chargingInfrastructure.requiredChargingPower} kW
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-purple-900 mb-3">Solución Recomendada:</h4>
+                  <ul className="text-sm text-purple-800 space-y-2">
+                    <li>
+                      • <strong>Tipo de cargador:</strong> {data.chargingInfrastructure.chargerType}
+                    </li>
+                    <li>
+                      • <strong>Estaciones necesarias:</strong> {data.chargingInfrastructure.requiredStations}
+                    </li>
+                    <li>
+                      • <strong>Potencia total instalada:</strong> {data.chargingInfrastructure.totalInstalledPower} kW
+                    </li>
+                    <li>
+                      • <strong>Costo estimado instalación:</strong> $
+                      {data.chargingInfrastructure.estimatedInstallationCost.toLocaleString()}
+                    </li>
+                  </ul>
+                </div>
               </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <Leaf className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-green-600">{co2Reduction} t</div>
-                <p className="text-sm text-gray-600">Reducción CO₂ anual</p>
+              <div className="mt-4 p-4 bg-purple-100 rounded-lg">
+                <p className="text-sm text-purple-800">
+                  <strong>💡 Recomendación:</strong> La potencia instalada se calculó considerando tu tipo de operación{" "}
+                  <span className="font-semibold">
+                    {data.operationType === "relaxed"
+                      ? "relajada"
+                      : data.operationType === "intermediate"
+                        ? "intermedia"
+                        : "intensiva"}
+                  </span>{" "}
+                  y el consumo energético de vehículos tipo{" "}
+                  <span className="font-semibold">
+                    {data.vehicleType === "sedan" ? "sedán" : data.vehicleType === "van" ? "camioneta" : "camión"}
+                  </span>
+                  .
+                </p>
               </div>
-              <div className="text-center p-4 bg-[#115F5F]/10 rounded-lg">
-                <Clock className="h-8 w-8 text-[#115F5F] mx-auto mb-2" />
-                <div className="text-2xl font-bold text-[#115F5F]">{paybackPeriod} años</div>
-                <p className="text-sm text-gray-600">Periodo de amortización</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Battery Capacity Explanation */}
+        <Card className="mb-8 border-blue-200 bg-blue-50/50">
+          <CardContent className="p-6">
+            <div className="flex items-start space-x-3">
+              <Battery className="w-6 h-6 text-blue-600 mt-1" />
+              <div>
+                <h3 className="font-semibold text-blue-900 mb-2">Capacidad de Batería Recomendada</h3>
+                <p className="text-blue-800 text-sm mb-3">
+                  El rango de {data.batteryCapacityMin}-{data.batteryCapacityMax} kWh incluye un margen de seguridad del
+                  30% y considera:
+                </p>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>
+                    • <strong>Valor mínimo:</strong> Capacidad base + 30% de margen operativo
+                  </li>
+                  <li>
+                    • <strong>Valor máximo:</strong> Incluye degradación hasta 80% SOH a los 5 años o 500,000 km
+                  </li>
+                  <li>
+                    • <strong>Consumo estimado:</strong>{" "}
+                    {data.vehicleType === "van" || data.vehicleType === "truck" ? "0.30" : "0.15"} kWh/km para este tipo
+                    de vehículo
+                  </li>
+                  <li>
+                    • <strong>Recomendación:</strong> Seleccionar vehículos con capacidad dentro de este rango para
+                    garantizar autonomía
+                  </li>
+                </ul>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Detailed Analysis */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Technical Analysis */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Truck className="h-5 w-5" />
-                <span>Análisis Técnico</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Compatibilidad de rutas</span>
-                  <Badge className="bg-green-100 text-green-800">Excelente</Badge>
-                </div>
-                <Progress value={92} className="h-2" />
-                <p className="text-xs text-gray-600">
-                  Tus rutas de {dailyKm}km diarios son ideales para vehículos eléctricos
-                </p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <h4 className="font-semibold text-sm">Vehículos recomendados:</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Mercedes eVito</span>
-                    <span className="text-sm font-semibold">95% match</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Nissan e-NV200</span>
-                    <span className="text-sm font-semibold">88% match</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Ford E-Transit</span>
-                    <span className="text-sm font-semibold">82% match</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Economic Analysis */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <DollarSign className="h-5 w-5" />
-                <span>Análisis Económico</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Inversión inicial</span>
-                  <span className="font-semibold">€{(35000 * fleetSize).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Ahorro combustible/año</span>
-                  <span className="font-semibold text-green-600">
-                    €{Math.round(dailyKm * 365 * 0.12 * fleetSize).toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Ahorro mantenimiento/año</span>
-                  <span className="font-semibold text-green-600">€{(2400 * fleetSize).toLocaleString()}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-lg">
-                  <span className="font-semibold">ROI anual</span>
-                  <span className="font-bold text-[#115F5F]">
-                    {Math.round((annualSavings / (35000 * fleetSize)) * 100)}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-green-50 p-3 rounded-lg">
-                <p className="text-sm text-green-800">✅ Proyecto altamente rentable con retorno garantizado</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Infrastructure Requirements */}
+        {/* Fleet Summary */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Zap className="h-5 w-5" />
-              <span>Infraestructura de Carga</span>
+              <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+              <span>Resumen de Análisis</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-3">Requerimientos mínimos</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Cargadores AC (22kW)</span>
-                    <span className="font-semibold">{Math.ceil(fleetSize / 2)} unidades</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Cargador DC (50kW)</span>
-                    <span className="font-semibold">1 unidad</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Potencia total requerida</span>
-                    <span className="font-semibold">{Math.ceil(fleetSize / 2) * 22 + 50} kW</span>
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-[#115F5F] mb-1">{data.paybackMonths || 36} meses</div>
+                <div className="text-sm text-gray-600">Período de recuperación</div>
               </div>
-              <div>
-                <h4 className="font-semibold mb-3">Inversión estimada</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Equipos de carga</span>
-                    <span className="font-semibold">€{(Math.ceil(fleetSize / 2) * 3000 + 25000).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Instalación</span>
-                    <span className="font-semibold">€{Math.round(fleetSize * 1500).toLocaleString()}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between text-lg">
-                    <span className="font-semibold">Total</span>
-                    <span className="font-bold text-[#115F5F]">
-                      €{(Math.ceil(fleetSize / 2) * 3000 + 25000 + fleetSize * 1500).toLocaleString()}
-                    </span>
-                  </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-[#115F5F] mb-1">
+                  ${(data.monthlyFuelSavings || 0).toLocaleString()}
                 </div>
+                <div className="text-sm text-gray-600">Ahorro mensual combustible</div>
               </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-[#115F5F] mb-1">
+                  {data.fleetSize || 1} vehículo{(data.fleetSize || 1) > 1 ? "s" : ""}
+                </div>
+                <div className="text-sm text-gray-600">Flota analizada</div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600 text-center">
+                Rutas diarias de {data.routeKmPerDay || 150} km • Tipo de vehículo:{" "}
+                {data.vehicleType === "sedan" ? "Sedán" : data.vehicleType === "van" ? "Camioneta" : "Camión"} •
+                Operación{" "}
+                {data.operationType === "relaxed"
+                  ? "relajada"
+                  : data.operationType === "intermediate"
+                    ? "intermedia"
+                    : "intensiva"}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Next Steps */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Próximos Pasos</CardTitle>
-            <CardDescription>Recomendaciones para avanzar en tu proyecto de electrificación</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-[#115F5F] text-white rounded-full flex items-center justify-center text-sm font-bold">
-                  1
+        {/* CTA Section */}
+        <Card className="bg-gradient-to-r from-[#115F5F] to-[#1a7a7a] text-white">
+          <CardContent className="p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">¿Quieres un análisis más detallado?</h2>
+            <p className="text-lg mb-6 opacity-90">
+              Obtén insights avanzados, análisis financiero completo y recomendaciones personalizadas
+            </p>
+            <Button
+              onClick={() => setShowPlanModal(true)}
+              size="lg"
+              className="bg-white text-[#115F5F] hover:bg-gray-100 font-semibold"
+            >
+              Ver Planes de Análisis
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Plan Selection Modal */}
+      <AnimatePresence>
+        {showPlanModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowPlanModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-gray-900">Selecciona tu Plan</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPlanModal(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
                 </div>
-                <div>
-                  <h4 className="font-semibold">Análisis detallado</h4>
-                  <p className="text-sm text-gray-600">
-                    Solicita un estudio completo con datos específicos de tu operación
+                <p className="text-gray-600 mt-2">Elige el nivel de análisis que mejor se adapte a tus necesidades</p>
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Plus Plan */}
+                  <Card className="relative border-2 border-[#115F5F]/20 hover:border-[#115F5F]/40 transition-colors">
+                    <CardContent className="p-8">
+                      <div className="text-center mb-6">
+                        <div className="w-16 h-16 bg-[#115F5F]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Zap className="w-8 h-8 text-[#115F5F]" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Plus</h3>
+                        <p className="text-gray-600 mb-4">Perfecto para flotas medianas</p>
+                        <div className="text-4xl font-bold text-gray-900 mb-1">$299</div>
+                        <p className="text-gray-500">/mes</p>
+                      </div>
+
+                      <ul className="space-y-3 mb-8">
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Análisis básico de ROI</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Comparativa de costos</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Reportes mensuales</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Soporte por email</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Dashboard básico</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Hasta 50 vehículos</span>
+                        </li>
+                        <li className="flex items-center space-x-3 opacity-50">
+                          <X className="w-5 h-5 text-gray-400" />
+                          <span className="text-sm text-gray-400">Sin análisis operacional</span>
+                        </li>
+                        <li className="flex items-center space-x-3 opacity-50">
+                          <X className="w-5 h-5 text-gray-400" />
+                          <span className="text-sm text-gray-400">Sin métricas ambientales</span>
+                        </li>
+                        <li className="flex items-center space-x-3 opacity-50">
+                          <X className="w-5 h-5 text-gray-400" />
+                          <span className="text-sm text-gray-400">Sin recomendaciones avanzadas</span>
+                        </li>
+                      </ul>
+
+                      <Button
+                        onClick={() => handlePlanSelection("plus")}
+                        className="w-full bg-[#115F5F] hover:bg-[#0d4a4a] text-white"
+                        size="lg"
+                      >
+                        Seleccionar Plus
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Pro Plan */}
+                  <Card className="relative border-2 border-[#115F5F] bg-gradient-to-br from-[#115F5F]/5 to-[#115F5F]/10">
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <Badge className="bg-[#115F5F] text-white px-4 py-1">⭐ Más Popular</Badge>
+                    </div>
+                    <CardContent className="p-8">
+                      <div className="text-center mb-6">
+                        <div className="w-16 h-16 bg-[#115F5F]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Crown className="w-8 h-8 text-[#115F5F]" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Pro</h3>
+                        <p className="text-gray-600 mb-4">Para empresas que buscan optimización completa</p>
+                        <div className="text-4xl font-bold text-gray-900 mb-1">$599</div>
+                        <p className="text-gray-500">/mes</p>
+                      </div>
+
+                      <ul className="space-y-3 mb-8">
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Todo lo de Plus +</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Análisis operacional avanzado</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Métricas ambientales detalladas</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Recomendaciones personalizadas</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Soporte prioritario 24/7</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Vehículos ilimitados</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Certificaciones ambientales</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Análisis de ciclo de vida</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Integración con sistemas ERP</span>
+                        </li>
+                        <li className="flex items-center space-x-3">
+                          <CheckCircle className="w-5 h-5 text-[#115F5F]" />
+                          <span className="text-sm">Reportes personalizados</span>
+                        </li>
+                      </ul>
+
+                      <Button
+                        onClick={() => handlePlanSelection("pro")}
+                        className="w-full bg-[#115F5F] hover:bg-[#0d4a4a] text-white"
+                        size="lg"
+                      >
+                        Seleccionar Pro
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Only show consultation option if a plan is selected */}
+                <div className="mt-8 text-center">
+                  <p className="text-gray-600 mb-4">
+                    ¿Necesitas ayuda para decidir? Nuestros especialistas te pueden orientar.
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    La consultoría está disponible después de seleccionar un plan.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-[#115F5F] text-white rounded-full flex items-center justify-center text-sm font-bold">
-                  2
-                </div>
-                <div>
-                  <h4 className="font-semibold">Prueba piloto</h4>
-                  <p className="text-sm text-gray-600">Implementa 1-2 vehículos para validar los resultados</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-[#115F5F] text-white rounded-full flex items-center justify-center text-sm font-bold">
-                  3
-                </div>
-                <div>
-                  <h4 className="font-semibold">Plan de implementación</h4>
-                  <p className="text-sm text-gray-600">Desarrolla un cronograma de transición gradual</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button className="flex-1 bg-[#115F5F] hover:bg-[#0d4a4a]">Solicitar Análisis Completo</Button>
-                <Button variant="outline" className="flex-1 bg-transparent">
-                  Agendar Consulta Gratuita
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Disclaimer */}
-        <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800">
-            <strong>Nota:</strong> Este es un análisis preliminar basado en datos generales. Los resultados reales
-            pueden variar según las condiciones específicas de operación, precios locales de energía y combustible, y
-            otros factores. Se recomienda realizar un estudio detallado antes de tomar decisiones de inversión.
-          </p>
-        </div>
-      </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
-  )
-}
-
-// Componente principal con Suspense
-export default function ResultPreview() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#115F5F] mx-auto mb-4"></div>
-            <p className="text-gray-600">Generando análisis...</p>
-          </div>
-        </div>
-      }
-    >
-      <ResultPreviewContent />
-    </Suspense>
   )
 }
