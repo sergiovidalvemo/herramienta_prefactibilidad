@@ -29,7 +29,7 @@ RUN npm install -g pnpm
 # Copiar dependencias instaladas
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copiar código fuente
+# Copiar código fuente completo (más simple y seguro)
 COPY . .
 
 # Variables de entorno para el build
@@ -59,7 +59,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copiar archivos públicos
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Crear directorio .next y cambiar propietario
 RUN mkdir .next
