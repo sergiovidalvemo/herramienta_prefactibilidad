@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,10 +17,13 @@ interface ChargingInfrastructure {
   requiredChargingPower: number
   chargerType: string
   chargerPowerKw: number
+  effectiveChargerPower: number
   chargersPerStation: number
+  requiredChargers: number
   requiredStations: number
   totalInstalledPower: number
   estimatedInstallationCost: number
+  efficiencyFactor: number
 }
 
 interface ResultData {
@@ -35,12 +38,13 @@ interface ResultData {
   routeKmPerDay?: number
   vehicleType?: string
   operationType?: string
+  chargingWindow?: number
   batteryCapacityMin?: number
   batteryCapacityMax?: number
   chargingInfrastructure?: ChargingInfrastructure
 }
 
-export default function ResultPreview() {
+function ResultPreviewContent() {
   const searchParams = useSearchParams()
   const [data, setData] = useState<ResultData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -99,14 +103,14 @@ export default function ResultPreview() {
       // Calculate charging infrastructure
       const dailyEnergyPerVehicle = dailyKm * energyConsumptionKwhPerKm
       const totalDailyEnergy = dailyEnergyPerVehicle * fleetSize
-      const chargingHours = 9 // 22:00 to 07:00
-      const requiredChargingPower = totalDailyEnergy / chargingHours
-
-      // Determine charger type based on operation type
+      const chargingHours = decodedData.chargingWindow || 9 // Use form value or default to 9 hours
+      
+      // Determine charger type and efficiency factor based on operation type
       let chargerType = ""
       let chargerPowerKw = 0
       let chargersPerStation = 1
       let estimatedCostPerStation = 0
+      let efficiencyFactor = 0.9 // Default
 
       switch (operationType) {
         case "relaxed":
@@ -114,30 +118,43 @@ export default function ResultPreview() {
           chargerPowerKw = 7
           chargersPerStation = 1
           estimatedCostPerStation = 3500
+          efficiencyFactor = 0.95
           break
         case "intermediate":
           chargerType = "Cargador comercial 60kW (2×30kW)"
           chargerPowerKw = 60
           chargersPerStation = 2
           estimatedCostPerStation = 45000
+          efficiencyFactor = 0.9
           break
         case "intensive":
           chargerType = "Cargador rápido 120kW (2×60kW)"
           chargerPowerKw = 120
           chargersPerStation = 2
           estimatedCostPerStation = 85000
+          efficiencyFactor = 0.85
           break
         default:
           chargerType = "Cargador comercial 60kW (2×30kW)"
           chargerPowerKw = 60
           chargersPerStation = 2
           estimatedCostPerStation = 45000
+          efficiencyFactor = 0.9
       }
 
-      const effectiveChargerPower = chargerPowerKw
-      const requiredStations = Math.ceil(requiredChargingPower / effectiveChargerPower)
-      const totalInstalledPower = requiredStations * chargerPowerKw
+      // Apply efficiency factor to charger power
+      const effectiveChargerPower = chargerPowerKw * efficiencyFactor
+      
+      // Calculate number of chargers needed using the formula:
+      // energia total requerida / potencia de cargador elegido / ventana temporal de recarga
+      const requiredChargers = Math.ceil(totalDailyEnergy / effectiveChargerPower / chargingHours)
+      
+      // Calculate stations needed (considering chargers per station)
+      const requiredStations = Math.ceil(requiredChargers / chargersPerStation)
+      const totalInstalledPower = requiredStations * chargerPowerKw * chargersPerStation
       const estimatedInstallationCost = requiredStations * estimatedCostPerStation
+      
+      const requiredChargingPower = totalDailyEnergy / chargingHours
 
       const chargingInfrastructure: ChargingInfrastructure = {
         dailyEnergyPerVehicle: Math.round(dailyEnergyPerVehicle * 10) / 10,
@@ -146,10 +163,13 @@ export default function ResultPreview() {
         requiredChargingPower: Math.round(requiredChargingPower * 10) / 10,
         chargerType,
         chargerPowerKw,
+        effectiveChargerPower: Math.round(effectiveChargerPower * 10) / 10,
         chargersPerStation,
+        requiredChargers,
         requiredStations,
         totalInstalledPower,
         estimatedInstallationCost,
+        efficiencyFactor,
       }
 
       const enhancedData = {
@@ -287,10 +307,10 @@ export default function ResultPreview() {
               <CardContent className="p-6">
                 <Plug className="w-12 h-12 text-purple-600 mx-auto mb-4" />
                 <div className="text-3xl font-bold text-purple-600 mb-2">
-                  {data.chargingInfrastructure?.totalInstalledPower || 0} kW
+                  {data.chargingInfrastructure?.requiredChargers || 0}
                 </div>
-                <p className="text-gray-600 font-medium">Potencia requerida</p>
-                <p className="text-sm text-gray-500 mt-2">Instalación eléctrica</p>
+                <p className="text-gray-600 font-medium">Cargadores necesarios</p>
+                <p className="text-sm text-gray-500 mt-2">{data.chargingInfrastructure?.totalInstalledPower || 0} kW total</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -319,11 +339,13 @@ export default function ResultPreview() {
                     </li>
                     <li>
                       • <strong>Ventana de carga:</strong> {data.chargingInfrastructure.chargingHours} horas
-                      (22:00-07:00)
                     </li>
                     <li>
                       • <strong>Potencia de carga requerida:</strong>{" "}
                       {data.chargingInfrastructure.requiredChargingPower} kW
+                    </li>
+                    <li>
+                      • <strong>Factor de eficiencia:</strong> {Math.round(data.chargingInfrastructure.efficiencyFactor * 100)}%
                     </li>
                   </ul>
                 </div>
@@ -332,6 +354,15 @@ export default function ResultPreview() {
                   <ul className="text-sm text-purple-800 space-y-2">
                     <li>
                       • <strong>Tipo de cargador:</strong> {data.chargingInfrastructure.chargerType}
+                    </li>
+                    <li>
+                      • <strong>Potencia nominal:</strong> {data.chargingInfrastructure.chargerPowerKw} kW
+                    </li>
+                    <li>
+                      • <strong>Potencia efectiva:</strong> {data.chargingInfrastructure.effectiveChargerPower} kW (con eficiencia)
+                    </li>
+                    <li>
+                      • <strong>Cargadores necesarios:</strong> {data.chargingInfrastructure.requiredChargers}
                     </li>
                     <li>
                       • <strong>Estaciones necesarias:</strong> {data.chargingInfrastructure.requiredStations}
@@ -348,7 +379,11 @@ export default function ResultPreview() {
               </div>
               <div className="mt-4 p-4 bg-purple-100 rounded-lg">
                 <p className="text-sm text-purple-800">
-                  <strong>💡 Recomendación:</strong> La potencia instalada se calculó considerando tu tipo de operación{" "}
+                  <strong>💡 Recomendación:</strong> Los cargadores se calcularon con tu ventana de carga de{" "}
+                  <span className="font-semibold">{data.chargingInfrastructure.chargingHours} horas</span>, 
+                  considerando un factor de eficiencia del{" "}
+                  <span className="font-semibold">{Math.round(data.chargingInfrastructure.efficiencyFactor * 100)}%</span>{" "}
+                  para operación{" "}
                   <span className="font-semibold">
                     {data.operationType === "relaxed"
                       ? "relajada"
@@ -642,5 +677,22 @@ export default function ResultPreview() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function ResultPreview() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#115F5F] mx-auto mb-4"></div>
+            <p className="text-gray-600">Calculando resultados...</p>
+          </div>
+        </div>
+      }
+    >
+      <ResultPreviewContent />
+    </Suspense>
   )
 }

@@ -20,6 +20,7 @@ interface FormData {
   // Step 2: Route Information
   routeKmPerDay: string
   routeType: string
+  chargingWindow: string
 
   // Step 3: Cost Information
   fuelCostPerLiter: string
@@ -32,6 +33,7 @@ const initialFormData: FormData = {
   operationType: "",
   routeKmPerDay: "",
   routeType: "",
+  chargingWindow: "9",
   fuelCostPerLiter: "",
   currentMonthlyCost: "",
 }
@@ -64,6 +66,16 @@ export default function FormWizard() {
       case 2:
         if (!formData.routeKmPerDay) newErrors.routeKmPerDay = "Requerido"
         if (!formData.routeType) newErrors.routeType = "Requerido"
+        if (!formData.chargingWindow) {
+          newErrors.chargingWindow = "Requerido"
+        } else {
+          const chargingValue = Number.parseFloat(formData.chargingWindow)
+          if (chargingValue > 24) {
+            newErrors.chargingWindow = "No puede ser mayor a 24 horas"
+          } else if (chargingValue <= 0) {
+            newErrors.chargingWindow = "Debe ser mayor a 0"
+          }
+        }
         break
       case 3:
         if (!formData.fuelCostPerLiter) newErrors.fuelCostPerLiter = "Requerido"
@@ -131,6 +143,7 @@ export default function FormWizard() {
         routeKmPerDay,
         vehicleType: formData.vehicleType,
         operationType: formData.operationType,
+        chargingWindow: Number.parseFloat(formData.chargingWindow),
       }
 
       // Encode data and redirect to results
@@ -257,6 +270,25 @@ export default function FormWizard() {
                   </SelectContent>
                 </Select>
                 {errors.routeType && <p className="text-red-500 text-sm mt-1">{errors.routeType}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="chargingWindow">Ventana temporal de recarga (horas)</Label>
+                <Input
+                  id="chargingWindow"
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="24"
+                  placeholder="ej. 9"
+                  value={formData.chargingWindow}
+                  onChange={(e) => updateFormData("chargingWindow", e.target.value)}
+                  className={errors.chargingWindow ? "border-red-500" : ""}
+                />
+                {errors.chargingWindow && <p className="text-red-500 text-sm mt-1">{errors.chargingWindow}</p>}
+                <p className="text-sm text-gray-500 mt-1">
+                  Tiempo disponible diario para cargar los vehículos (máximo 24 horas)
+                </p>
               </div>
             </div>
           </motion.div>

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  vemo-prefactibilidad-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Bind mount para desarrollo (hot reload)
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - CHOKIDAR_USEPOLLING=true
+    command: pnpm dev
+    restart: unless-stopped
+    networks:
+      - vemo-dev-network
+
+networks:
+  vemo-dev-network:
+    driver: bridge
