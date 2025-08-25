@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { TrendingUp, Leaf, ArrowRight, CheckCircle, AlertCircle, Zap, Battery, Crown, X, Plug } from "lucide-react"
 import Confetti from "./confetti"
 import VemoLogo from "./vemo-logo"
+import ContactForm from "./contact-form"
 
 interface ChargingInfrastructure {
   dailyEnergyPerVehicle: number
@@ -494,6 +495,28 @@ function ResultPreviewContent() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Contact Form Section */}
+        <div className="mt-8">
+          <ContactForm 
+            preliminaryData={{
+              fleetSize: data.fleetSize,
+              vehicleType: data.vehicleType,
+              operationType: data.operationType,
+              routeKmPerDay: data.routeKmPerDay,
+              chargingWindow: data.chargingWindow,
+              monthlyFuelSavings: data.monthlyFuelSavings,
+              savingsPct: data.savingsPct,
+              co2: data.co2,
+              batteryCapacityMin: data.batteryCapacityMin,
+              batteryCapacityMax: data.batteryCapacityMax
+            }}
+            onSuccess={() => {
+              // Opcionalmente mostrar confetti o alguna animación
+              setShowConfetti(true)
+            }}
+          />
+        </div>
       </div>
 
       {/* Plan Selection Modal */}
