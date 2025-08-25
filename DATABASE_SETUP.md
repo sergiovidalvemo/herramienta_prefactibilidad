@@ -31,11 +31,11 @@ Una vez creado el proyecto:
 
 Crear un archivo `.env.local` con las siguientes variables:
 
-```bash
+\`\`\`bash
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ0eXAiOiJKV1QiLCJhbGc...tu-service-role-key
-```
+\`\`\`
 
 ⚠️ **IMPORTANTE**: El `service_role` key tiene permisos administrativos. Nunca lo expongas en el cliente.
 
@@ -79,14 +79,14 @@ La estructura de la tabla será:
 Navegar a: `http://localhost:3000/api/contact`
 
 Deberías ver una respuesta como:
-```json
+\`\`\`json
 {
   "status": "OK",
   "message": "Contact API is running and Supabase is connected",
   "timestamp": "2024-01-01T12:00:00.000Z",
   "totalSubmissions": 0
 }
-```
+\`\`\`
 
 ### 2. Ver datos en Supabase Dashboard
 1. Ve a **Table Editor** en tu proyecto de Supabase
@@ -95,9 +95,9 @@ Deberías ver una respuesta como:
 
 ### 3. Consultas SQL directas
 En **SQL Editor** puedes ejecutar consultas como:
-```sql
+\`\`\`sql
 SELECT * FROM contact_submissions ORDER BY created_at DESC LIMIT 10;
-```
+\`\`\`
 
 ## Solución de Problemas
 
@@ -168,9 +168,9 @@ El formulario aparece en la página de preview de resultados (`/result/preview`)
 Si ya tenías datos en PostgreSQL local:
 
 1. **Exportar datos**:
-   ```sql
+   \`\`\`sql
    COPY contact_submissions TO '/tmp/contacts.csv' DELIMITER ',' CSV HEADER;
-   ```
+   \`\`\`
 
 2. **Importar en Supabase**:
    - Ve a **Table Editor** → `contact_submissions`

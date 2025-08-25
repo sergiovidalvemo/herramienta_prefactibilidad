@@ -4,13 +4,13 @@
 
 Si ves este error en la consola:
 
-```
+\`\`\`
 Supabase error: {
   code: '22003',
   details: 'A field with precision 5, scale 2 must round to an absolute value less than 10^3.',
   message: 'numeric field overflow'
 }
-```
+\`\`\`
 
 Significa que el campo `savings_percentage` no puede almacenar el valor calculado porque es demasiado grande para el tipo `DECIMAL(5,2)` que solo permite hasta 999.99.
 
@@ -45,13 +45,13 @@ Significa que el campo `savings_percentage` no puede almacenar el valor calculad
 
 Después de ejecutar el script, puedes verificar que los tipos se actualizaron:
 
-```sql
+\`\`\`sql
 SELECT column_name, data_type, numeric_precision, numeric_scale 
 FROM information_schema.columns 
 WHERE table_name = 'contact_submissions' 
 AND data_type = 'numeric'
 ORDER BY column_name;
-```
+\`\`\`
 
 Deberías ver:
 - `co2_avoided`: precision=12, scale=2

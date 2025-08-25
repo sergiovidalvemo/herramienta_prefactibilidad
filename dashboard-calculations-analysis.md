@@ -5,7 +5,7 @@
 ### 1. **Cálculos REALES** - `app/api/estimate/route.ts`
 Este es donde se encuentran los cálculos matemáticos verdaderos:
 
-```typescript
+\`\`\`typescript
 // Calculate energy consumption based on vehicle type
 let energyConsumptionKwhPerKm = 0.15 // Default for sedans
 if (vehicleType === "van") {
@@ -34,7 +34,7 @@ const savingsPct = Math.round((monthlySavings / (monthlyFuelCost + maintenanceSp
 
 // CO2 calculation (kg per month)
 const co2 = Math.round((routeKmPerDay * 2.3 * fleetSize * 30) / 1000) // 2.3kg CO2 per liter diesel
-```
+\`\`\`
 
 #### Cálculos de Infraestructura de Carga:
 - **Potencia requerida**: Basada en energía diaria y ventana de carga de 9 horas
@@ -45,7 +45,7 @@ const co2 = Math.round((routeKmPerDay * 2.3 * fleetSize * 30) / 1000) // 2.3kg C
 ### 2. **Datos Simulados de la Dashboard** - `components/dashboard.tsx`
 La dashboard actualmente muestra datos hardcodeados:
 
-```typescript
+\`\`\`typescript
 const mockData: DashboardData = {
   plan: "plus",
   fleetSize: 25,
@@ -80,12 +80,12 @@ const fleetStatusData = [
   { name: "Mantenimiento", value: 2, color: "#FF7575" },
   { name: "Carga", value: 1, color: "#FFA500" },
 ]
-```
+\`\`\`
 
 ### 3. **Datos por Defecto** - `app/dashboard/page.tsx`
 La página del dashboard tiene datos predeterminados:
 
-```typescript
+\`\`\`typescript
 const defaultData = {
   fleetSize: 25,
   vehicleType: "Camiones de reparto",
@@ -99,7 +99,7 @@ const defaultData = {
   totalInvestment: 850000,
   roi5Years: 125,
 }
-```
+\`\`\`
 
 ## 🚨 Problema Identificado
 
@@ -139,7 +139,7 @@ Desde la API `/api/estimate/route.ts`:
 
 ## 📁 Estructura de Archivos Relevantes
 
-```
+\`\`\`
 app/
 ├── api/
 │   └── estimate/
@@ -148,7 +148,7 @@ app/
 │   └── page.tsx             # ❌ Datos estáticos por defecto
 components/
 └── dashboard.tsx            # ❌ Datos mock hardcodeados
-```
+\`\`\`
 
 ## 🎯 Recomendación
 

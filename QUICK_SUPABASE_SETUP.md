@@ -16,23 +16,23 @@
 1. Ve a **Settings** → **API** (en la barra lateral)
 2. Copia estos valores:
 
-```bash
+\`\`\`bash
 Project URL: https://xxxxx.supabase.co
 service_role key: eyJ0eXAiOiJKV1QiLCJhbGc...
-```
+\`\`\`
 
 ## 3. Configurar Variables de Entorno
 
 1. Copia `env.example` a `.env.local`:
-   ```bash
+   \`\`\`bash
    cp env.example .env.local
-   ```
+   \`\`\`
 
 2. Edita `.env.local` con tus credenciales:
-   ```bash
+   \`\`\`bash
    NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=eyJ0eXAiOiJKV1QiLCJhbGc...
-   ```
+   \`\`\`
 
 ## 4. Crear Tabla en Supabase
 
@@ -44,9 +44,9 @@ service_role key: eyJ0eXAiOiJKV1QiLCJhbGc...
 ## 5. Verificar Todo Funciona
 
 1. Reinicia tu servidor de desarrollo:
-   ```bash
+   \`\`\`bash
    npm run dev
-   ```
+   \`\`\`
 
 2. Ve a `http://localhost:3000/api/contact`
    - Debe mostrar: `{"status":"OK","message":"Contact API is running and Supabase is connected"}`
@@ -76,13 +76,13 @@ Tu aplicación ahora está conectada a Supabase y almacenando datos en la nube.
 ## 🆘 Problemas Comunes
 
 ### Error: "Cannot read properties of undefined"
-```bash
+\`\`\`bash
 # Verificar que .env.local existe
 ls -la .env.local
 
 # Reiniciar servidor
 npm run dev
-```
+\`\`\`
 
 ### Error: "Invalid API key"
 - Verificar que copiaste el `service_role` key (no el `anon` key)
@@ -109,4 +109,3 @@ Si tienes problemas:
 3. Revisa `DATABASE_SETUP.md` para guía completa
 4. Logs del servidor: ventana donde corre `npm run dev`
 5. Logs de Supabase: Dashboard → Logs → API
-

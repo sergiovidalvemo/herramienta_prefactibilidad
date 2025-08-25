@@ -37,7 +37,7 @@
 ## ⚡ Comandos Quick Start
 
 ### Desarrollo
-```bash
+\`\`\`bash
 # Iniciar desarrollo con Docker
 ./scripts/dev-docker.sh start
 
@@ -46,10 +46,10 @@
 
 # Acceder al contenedor
 ./scripts/dev-docker.sh shell
-```
+\`\`\`
 
 ### Producción
-```bash
+\`\`\`bash
 # Build automático
 ./scripts/docker-build.sh latest production
 
@@ -58,7 +58,7 @@ docker-compose up -d
 
 # Solo la aplicación
 docker run -p 3000:3000 vemo-prefactibilidad:latest
-```
+\`\`\`
 
 ## 🔧 Características Implementadas
 
@@ -114,36 +114,36 @@ docker run -p 3000:3000 vemo-prefactibilidad:latest
 - ✅ Docker Swarm
 
 ### Registry Tags
-```bash
+\`\`\`bash
 # Ejemplo para AWS ECR
 docker tag vemo-prefactibilidad:latest 123456789.dkr.ecr.region.amazonaws.com/vemo:latest
 docker push 123456789.dkr.ecr.region.amazonaws.com/vemo:latest
-```
+\`\`\`
 
 ## 🔍 Troubleshooting Rápido
 
 ### Build Issues
-```bash
+\`\`\`bash
 # Limpiar cache y rebuild
 docker builder prune
 docker-compose build --no-cache
-```
+\`\`\`
 
 ### Runtime Issues
-```bash
+\`\`\`bash
 # Ver logs detallados
 docker-compose logs -f vemo-prefactibilidad
 
 # Health check manual
 curl http://localhost:3000/api/health
-```
+\`\`\`
 
 ### Port Conflicts
-```bash
+\`\`\`bash
 # Cambiar puerto en docker-compose.yml
 ports:
   - "3001:3000"  # localhost:3001 -> container:3000
-```
+\`\`\`
 
 ## 📝 Próximos Pasos
 

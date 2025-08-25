@@ -12,17 +12,17 @@ Esta guía te ayudará a ejecutar la aplicación de prefactibilidad de VEMO usan
 
 ### Opción 1: Solo la aplicación Next.js
 
-```bash
+\`\`\`bash
 # Construir la imagen
 docker build -t vemo-prefactibilidad .
 
 # Ejecutar el contenedor
 docker run -p 3000:3000 --name vemo-app vemo-prefactibilidad
-```
+\`\`\`
 
 ### Opción 2: Aplicación completa con Nginx (Recomendado)
 
-```bash
+\`\`\`bash
 # Levantar todos los servicios
 docker-compose up -d
 
@@ -31,7 +31,7 @@ docker-compose logs -f
 
 # Parar servicios
 docker-compose down
-```
+\`\`\`
 
 ## 🌐 Acceso a la Aplicación
 
@@ -43,7 +43,7 @@ docker-compose down
 
 ### Construcción y Deployment
 
-```bash
+\`\`\`bash
 # Construir imagen optimizada para producción
 docker build -t vemo-prefactibilidad:latest .
 
@@ -55,11 +55,11 @@ docker-compose up -d
 
 # Reconstruir servicios
 docker-compose up --build
-```
+\`\`\`
 
 ### Monitoreo y Debugging
 
-```bash
+\`\`\`bash
 # Ver logs de la aplicación
 docker-compose logs vemo-prefactibilidad
 
@@ -74,11 +74,11 @@ docker inspect vemo-app
 
 # Ver recursos utilizados
 docker stats vemo-app
-```
+\`\`\`
 
 ### Mantenimiento
 
-```bash
+\`\`\`bash
 # Limpiar imágenes no utilizadas
 docker image prune -f
 
@@ -90,13 +90,13 @@ docker-compose restart
 
 # Parar y remover contenedores
 docker-compose down --volumes
-```
+\`\`\`
 
 ## ⚙️ Variables de Entorno
 
 Puedes personalizar la aplicación usando variables de entorno:
 
-```bash
+\`\`\`bash
 # Archivo .env.production
 NODE_ENV=production
 PORT=3000
@@ -104,7 +104,7 @@ HOSTNAME=0.0.0.0
 
 # Para desarrollo local
 NEXT_PUBLIC_API_URL=http://localhost:3000
-```
+\`\`\`
 
 ## 🏗️ Arquitectura Docker
 
@@ -139,7 +139,7 @@ El Dockerfile utiliza un build multi-stage para optimizar el tamaño:
 
 La aplicación incluye health checks automáticos:
 
-```javascript
+\`\`\`javascript
 // Endpoint: /api/health
 {
   "status": "healthy",
@@ -147,68 +147,68 @@ La aplicación incluye health checks automáticos:
   "uptime": 3600,
   "environment": "production"
 }
-```
+\`\`\`
 
 ## 🚀 Deploy en Producción
 
 ### Con Docker Compose
 
-```bash
+\`\`\`bash
 # Producción con SSL (configurar certificados)
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
+\`\`\`
 
 ### En Servidores Cloud
 
-```bash
+\`\`\`bash
 # AWS ECS, Google Cloud Run, Azure Container Instances
 docker tag vemo-prefactibilidad:latest your-registry/vemo-prefactibilidad:latest
 docker push your-registry/vemo-prefactibilidad:latest
-```
+\`\`\`
 
 ## 🛠️ Troubleshooting
 
 ### Problemas Comunes
 
 #### Puerto ya en uso
-```bash
+\`\`\`bash
 # Verificar qué proceso usa el puerto
 sudo lsof -i :3000
 
 # Cambiar puerto en docker-compose.yml
 ports:
   - "3001:3000"  # Puerto local:Puerto contenedor
-```
+\`\`\`
 
 #### Problemas de memoria
-```bash
+\`\`\`bash
 # Aumentar memoria disponible para Docker
 # Docker Desktop > Settings > Resources > Memory > 4GB+
-```
+\`\`\`
 
 #### Problemas de permisos
-```bash
+\`\`\`bash
 # En Linux, agregar usuario al grupo docker
 sudo usermod -aG docker $USER
 newgrp docker
-```
+\`\`\`
 
 #### Build failures
-```bash
+\`\`\`bash
 # Limpiar cache y reconstruir
 docker builder prune
 docker-compose build --no-cache
-```
+\`\`\`
 
 ### Logs de Debugging
 
-```bash
+\`\`\`bash
 # Logs detallados de construcción
 docker-compose build --progress=plain
 
 # Logs de runtime con timestamps
 docker-compose logs -t -f vemo-prefactibilidad
-```
+\`\`\`
 
 ## 📈 Optimizaciones de Rendimiento
 
@@ -230,7 +230,7 @@ El Dockerfile está optimizado para cachear dependencias de Node.js, reduciendo 
 
 ## 🔄 Actualizaciones
 
-```bash
+\`\`\`bash
 # Actualizar imagen
 git pull origin main
 docker-compose build
@@ -239,7 +239,7 @@ docker-compose up -d
 # Zero-downtime deployment (con load balancer)
 docker-compose up --scale vemo-prefactibilidad=2
 # ... actualizar uno por uno
-```
+\`\`\`
 
 ## 📝 Notas Adicionales
 

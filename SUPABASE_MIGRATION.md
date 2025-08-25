@@ -73,10 +73,10 @@
 ## 🔧 Funciones Disponibles
 
 ### API Endpoints
-```
+\`\`\`
 GET  /api/contact - Health check y estadísticas
 POST /api/contact - Guardar datos de contacto
-```
+\`\`\`
 
 ### Datos Almacenados
 - **Información de contacto**: nombre, empresa, puesto, email, teléfono
@@ -92,21 +92,21 @@ POST /api/contact - Guardar datos de contacto
 ## 🛠️ Comandos Útiles
 
 ### Desarrollo Local
-```bash
+\`\`\`bash
 npm run dev                    # Iniciar servidor
 npm run build                  # Build para producción
-```
+\`\`\`
 
 ### Verificar Configuración
-```bash
+\`\`\`bash
 curl http://localhost:3000/api/contact
-```
+\`\`\`
 
 ### Ver Logs
-```bash
+\`\`\`bash
 # Logs del servidor Next.js
 # También disponibles en Supabase Dashboard > Logs
-```
+\`\`\`
 
 ## 📝 Notas Técnicas
 
@@ -150,4 +150,3 @@ curl http://localhost:3000/api/contact
 - ✅ **API robusta** con manejo de errores
 - ✅ **Documentación completa** para configuración
 - ✅ **Experiencia de usuario fluida** con validaciones y animaciones
-
